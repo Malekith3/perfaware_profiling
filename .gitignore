@@ -1,0 +1,7 @@
+*.json
+*.f64
+
+# CLion specific files
+.idea/
+cmake-build-debug/
+cmake-build-release/
