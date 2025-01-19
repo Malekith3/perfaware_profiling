@@ -14,8 +14,8 @@ namespace
   const double UNIFORM_MIN_LONGITUDE = -180.0;
   const double UNIFORM_MAX_LONGITUDE = 180.0;
   const size_t CLUSTER_NUMBER = 64U;
-  const double CLUSTER_LATITUDE_SPREAD = 20.0;
-  const double CLUSTER_LONGITUDE_SPREAD = 10.0;
+  const double CLUSTER_LATITUDE_SPREAD = 5.0;
+  const double CLUSTER_LONGITUDE_SPREAD = 5.0;
   const double EARTH_RADIUS = 6372.8;
   const std::string FILE_NAME = "coordinates.json";
   const size_t BATCH_SIZE = 100000U;
@@ -44,8 +44,8 @@ std::tuple<double,double,double,double> generateClusterCoordinate(std::mt19937& 
   static double clusterCenterLatitude, clusterCenterLongitude;
 
   static double clusterOffsetLatitude, clusterOffsetLongitude;
-  static std::uniform_real_distribution<double> offsetDistributionLat(-CLUSTER_LATITUDE_SPREAD, CLUSTER_LATITUDE_SPREAD);
-  static std::uniform_real_distribution<double> offsetDistributionLong(-CLUSTER_LONGITUDE_SPREAD, CLUSTER_LONGITUDE_SPREAD);
+  static std::uniform_real_distribution<double> offsetDistributionLat(0, CLUSTER_LATITUDE_SPREAD);
+  static std::uniform_real_distribution<double> offsetDistributionLong(0, CLUSTER_LONGITUDE_SPREAD);
 
   if(pointsGenerated % pointsPerCluster == 0U)
   {
@@ -57,13 +57,13 @@ std::tuple<double,double,double,double> generateClusterCoordinate(std::mt19937& 
     clusterOffsetLongitude = offsetDistributionLong(RandomNumberGenerator);
   }
 
-  clusterOffsetLatitude  = std::clamp(clusterCenterLatitude + clusterOffsetLatitude, UNIFORM_MIN_LATITUDE, UNIFORM_MAX_LATITUDE);
-  clusterOffsetLongitude = std::clamp(clusterCenterLongitude + clusterOffsetLongitude, UNIFORM_MIN_LONGITUDE, UNIFORM_MAX_LONGITUDE);
+  auto clusterLatWithOffset  = std::clamp(clusterCenterLatitude + clusterOffsetLatitude, UNIFORM_MIN_LATITUDE, UNIFORM_MAX_LATITUDE);
+  auto clusterLongWithOffset = std::clamp(clusterCenterLongitude + clusterOffsetLongitude, UNIFORM_MIN_LONGITUDE, UNIFORM_MAX_LONGITUDE);
 
-  auto minLatitude = std::min(clusterCenterLatitude, clusterOffsetLatitude);
-  auto maxLatitude = std::max(clusterCenterLatitude, clusterOffsetLatitude);
-  auto minLongitude = std::min(clusterCenterLongitude, clusterOffsetLongitude);
-  auto maxLongitude = std::max(clusterCenterLongitude, clusterOffsetLongitude);
+  auto minLatitude = std::min(clusterCenterLatitude, clusterLatWithOffset);
+  auto maxLatitude = std::max(clusterCenterLatitude, clusterLatWithOffset);
+  auto minLongitude = std::min(clusterCenterLongitude, clusterLongWithOffset);
+  auto maxLongitude = std::max(clusterCenterLongitude, clusterLongWithOffset);
 
   std::uniform_real_distribution<double> LatitudeDistribution(minLatitude, maxLatitude);
   std::uniform_real_distribution<double> LongitudeDistribution(minLongitude, maxLongitude);
@@ -74,7 +74,7 @@ std::tuple<double,double,double,double> generateClusterCoordinate(std::mt19937& 
     LatitudeDistribution(RandomNumberGenerator),
     LongitudeDistribution(RandomNumberGenerator)
   };
-
+  pointsGenerated++;
   return twoPointsCoord;
 }
 
@@ -131,6 +131,16 @@ void writeHaversineDistanceToFileBatchesBIN(std::vector<double>& distances)
     }
 }
 
+void deletePreviousFiles()
+{
+  if (std::ifstream(FILE_NAME)) {
+    std::remove(FILE_NAME.c_str());
+  }
+
+  if (std::ifstream(DISTANCE_ANSWERS_FILE_NAME)) {
+    std::remove(DISTANCE_ANSWERS_FILE_NAME.c_str());
+  }
+}
 
 void openJsonFile()
 {
@@ -176,6 +186,7 @@ int main(int argc, char* argv[]) {
   std::vector<double> distances;
   coordinates.reserve(BATCH_SIZE + 10);
   distances.reserve(BATCH_SIZE + 10);
+  deletePreviousFiles();
   openJsonFile();
 
   for (int genCoordNumber = 0; genCoordNumber < numCoordinates; genCoordNumber++)
