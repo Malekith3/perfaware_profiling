@@ -7,10 +7,6 @@ add_executable(haversine_generator
         external/haversine_formula.cpp
         HarversineCoordGenerator/haversine_generator.cpp)
 
-add_executable(json_parser
-        JSONParser/json_parser.cpp
-        JSONParser/json_parser_main.cpp)
-
 include_directories(${CMAKE_SOURCE_DIR}/external/)
 
 include(CTest)
