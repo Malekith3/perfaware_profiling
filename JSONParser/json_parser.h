@@ -38,6 +38,21 @@ class JSONNode
       return _dataObject[key];
     }
 
+  const JSONNode& operator[](const std::string& key) const
+  {
+    if(_type != JSONType::OBJECT)
+    {
+      throw std::runtime_error("Invalid type");
+    }
+
+    if(auto mapIter{_dataObject.find(key)}; mapIter != _dataObject.end())
+    {
+      return mapIter->second;
+    }
+
+    return *this;
+  }
+
 
     ~JSONNode() = default;
 
@@ -61,6 +76,8 @@ class JSONNode
       }
       return _dataArray;
     }
+
+    [[nodiscard]] bool isEmpty() const {return _dataObject.empty();}
 
  private:
    JSONType _type;

@@ -117,18 +117,18 @@ void writeCoordToFileInButches(std::vector<std::tuple<double, double, double, do
 
 void writeHaversineDistanceToFileBatchesBIN(std::vector<double>& distances)
 {
-    std::ofstream file(DISTANCE_ANSWERS_FILE_NAME, std::ios::app);
+  std::ofstream file(DISTANCE_ANSWERS_FILE_NAME, std::ios::binary | std::ios::app);
 
-    if(!file.is_open() || !file.good())
-    {
-        std::cerr << "Error: Could not open file " << FILE_NAME << std::endl;
-        return;
-    }
+  if (!file.is_open() || !file.good())
+  {
+    std::cerr << "Error: Could not open file " << FILE_NAME << std::endl;
+    return;
+  }
 
-    for(auto& distance : distances)
-    {
-        file << distance;
-    }
+  for (auto& distance : distances)
+  {
+    file.write(reinterpret_cast<const char*>(&distance), sizeof(double));
+  }
 }
 
 void deletePreviousFiles()
@@ -189,6 +189,7 @@ int main(int argc, char* argv[]) {
   deletePreviousFiles();
   openJsonFile();
 
+  auto count = 0;
   for (int genCoordNumber = 0; genCoordNumber < numCoordinates; genCoordNumber++)
   {
       std::tuple<double,double,double,double> twoPointsCoord;
@@ -204,6 +205,7 @@ int main(int argc, char* argv[]) {
     {
       writeCoordToFileInButches(coordinates, genCoordNumber == numCoordinates - 1);
       writeHaversineDistanceToFileBatchesBIN(distances);
+      count += distances.size();
       coordinates.clear();
       distances.clear();
     }

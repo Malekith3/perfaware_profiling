@@ -14,11 +14,12 @@ static std::variant<std::string, bool, double> getValueFromString(const std::str
   bool isDouble{false};
   for(auto &c : value)
   {
-    if(!isdigit(c) && c != '.')
+    if(!isdigit(c) && c != '.' && c != '-')
     {
       isDouble = false;
       break;
     }
+
     isDouble = true;
   }
 
@@ -55,6 +56,7 @@ static std::string searchKey(const std::string &json, size_t &jsonIter)
 
 static void searchForSemiColon(const std::string &json, size_t &jsonIter)
 {
+  skipWhiteSpace(json, jsonIter);
   while(json[jsonIter] != ':' && jsonIter < json.size())
   {
     jsonIter++;
@@ -128,6 +130,7 @@ static JSONNode createJsonNodeFromVariant(std::variant<std::string, bool, double
   return {};
 }
 
+
 JSONNode JSONParser::parse(const std::string &json)
 {
     if(json.empty())
@@ -143,15 +146,51 @@ JSONNode JSONParser::parse(const std::string &json)
     }
 
     size_t jsonIter{0u};
+    bool arrayFlag{false};
+    std::string lastKey;
+    std::string arrayKey;
+    bool newJsonObject{false};
+
+    auto getArrayNode = [&rootNode, &lastKey, &arrayKey]() -> JSONNode&
+    {
+      if(arrayKey.empty())
+      {
+        return rootNode.getArray().back()[lastKey];
+      }
+      return rootNode[arrayKey].getArray().back()[lastKey];
+    };
+
     while(jsonIter < json.size())
     {
       skipWhiteSpace(json, jsonIter);
 
       if(json[jsonIter] == '\"')
       {
-        std::string key = searchKey(json, jsonIter);
-        rootNode[key] = JSONNode();
+        lastKey = searchKey(json, jsonIter);
+
+        if(arrayFlag && newJsonObject)
+        {
+          if(arrayKey.empty())
+          {
+            rootNode.getArray().emplace_back(JSONType::OBJECT);
+            rootNode.getArray().back()[lastKey] = JSONNode();
+            newJsonObject = false;
+          }
+          else
+          {
+            rootNode[arrayKey].getArray().emplace_back(JSONType::OBJECT);
+            rootNode[arrayKey].getArray().back()[lastKey] = JSONNode();
+            newJsonObject = false;
+          }
+        }
+        else
+        {
+          rootNode[lastKey] = JSONNode();
+        }
+
         searchForSemiColon(json, jsonIter);
+
+        JSONNode& node = arrayFlag ? getArrayNode() : rootNode[lastKey];
 
         if(json[jsonIter] == ':')
         {
@@ -162,27 +201,50 @@ JSONNode JSONParser::parse(const std::string &json)
           {
             std::string value = searchForString(json, jsonIter);
             auto valueVariant = getValueFromString(value);
-            rootNode[key] = createJsonNodeFromVariant(valueVariant);
+            node = createJsonNodeFromVariant(valueVariant);
           }
           else if(json[jsonIter] == 't' || json[jsonIter] == 'f')
           {
             std::string value = searchForBool(json, jsonIter);
             auto valueVariant = getValueFromString(value);
-            rootNode[key] = createJsonNodeFromVariant(valueVariant);
+            node = createJsonNodeFromVariant(valueVariant);
           }
-          else if(std::isdigit(json[jsonIter]))
+          else if(std::isdigit(json[jsonIter]) || json[jsonIter] == '-')
           {
             std::string value = searchForNumber(json, jsonIter);
             auto valueVariant = getValueFromString(value);
-            rootNode[key] = createJsonNodeFromVariant(valueVariant);
+            node = createJsonNodeFromVariant(valueVariant);
           }
-          else if(json[jsonIter] == '[')
-          {
-            //TODO add array parsing
-          }
-
         }
       }
+
+      if(json[jsonIter] == '[')
+      {
+        arrayFlag = true;
+        if(rootNode.isEmpty())
+        {
+          rootNode = JSONNode(JSONType::ARRAY);
+        }
+        else if (!lastKey.empty())
+        {
+          rootNode[lastKey] = JSONNode(JSONType::ARRAY);
+          arrayKey = lastKey;
+        }
+      }
+      else if(json[jsonIter] == ']')
+      {
+        arrayFlag = false;
+      }
+
+      if(json[jsonIter] == '{')
+      {
+        newJsonObject = true;
+      }
+      else if(json[jsonIter] == '}')
+      {
+        newJsonObject = false;
+      }
+
       jsonIter++;
     }
 
