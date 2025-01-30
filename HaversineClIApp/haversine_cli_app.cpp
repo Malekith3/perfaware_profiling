@@ -42,7 +42,6 @@ bool isCliArgsValid(int argc, char* argv[])
 
 std::string readJsonFile(const std::string& jsonFilePath)
 {
-  TimeFunction;
   std::ifstream jsonFile(jsonFilePath, std::ios::in | std::ios::binary | std::ios::ate);
   if (!jsonFile)
   {
@@ -50,6 +49,7 @@ std::string readJsonFile(const std::string& jsonFilePath)
   }
 
   std::streamsize fileSize = jsonFile.tellg();
+  TimeBandwidth(__func__, fileSize);
   jsonFile.seekg(0, std::ios::beg);
   std::string fileContent(fileSize, '\0');
 
@@ -61,23 +61,27 @@ std::string readJsonFile(const std::string& jsonFilePath)
   return fileContent;
 }
 
-std::vector<double> readBinFile(const std::string& binFilePath)
+std::vector<double> readBinFile(const std::string &binFilePath, size_t numberOfPairs)
 {
-  TimeFunction;
-  std::ifstream binFile(binFilePath, std::ios::binary);
-  if (!binFile)
-  {
-    throw std::runtime_error("Could not open file");
+  std::ifstream file(binFilePath, std::ios::binary | std::ios::ate);
+  if (!file) {
+    throw std::runtime_error("Failed to open file");
   }
 
-  std::vector<double> distances;
-  double distance;
-  while (binFile.read(reinterpret_cast<char*>(&distance), sizeof(double)))
+  std::vector<double> data;
+  std::streamsize fileSize = file.tellg();
+  TimeBandwidth(__func__, fileSize);
+  file.seekg(0, std::ios::beg);
+
+  size_t numElements = fileSize / sizeof(double);
+  data.resize(numElements);
+
+  if (!file.read(reinterpret_cast<char*>(data.data()), fileSize))
   {
-    distances.push_back(distance);
+    throw std::runtime_error("Failed to read file");
   }
 
-  return distances;
+  return data;
 }
 
 
@@ -91,14 +95,16 @@ int main(int argc, char* argv[])
 
   std::string jsonFilePath = argv[1];
   std::string binFilePath = argv[2];
+  std::string jsonString;
 
-  std::string jsonString = readJsonFile(jsonFilePath);
+  jsonString = readJsonFile(jsonFilePath);
+
 
   auto json = JSONParser::parse(jsonString);
 
-  auto answers = readBinFile(binFilePath);
-
   auto pairs = json["pairs"].getArray();
+
+  auto answers = readBinFile(binFilePath, pairs.size());
 
   if(answers.size()!= pairs.size())
   {
