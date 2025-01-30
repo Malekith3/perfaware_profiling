@@ -40,8 +40,10 @@ bool isCliArgsValid(int argc, char* argv[])
   return true;
 }
 
+//C++ style file reading
 std::string readJsonFile(const std::string& jsonFilePath)
 {
+  const size_t buffer_size = 256  * 1024;
   std::ifstream jsonFile(jsonFilePath, std::ios::in | std::ios::binary | std::ios::ate);
   if (!jsonFile)
   {
@@ -49,10 +51,13 @@ std::string readJsonFile(const std::string& jsonFilePath)
   }
 
   std::streamsize fileSize = jsonFile.tellg();
-  TimeBandwidth(__func__, fileSize);
   jsonFile.seekg(0, std::ios::beg);
   std::string fileContent(fileSize, '\0');
 
+  std::vector<char> buffer(buffer_size);
+  jsonFile.rdbuf()->pubsetbuf(buffer.data(), buffer.size());
+
+  TimeBandwidth(__func__, fileSize);
   if (!jsonFile.read(&fileContent[0], fileSize)) {
     std::cerr << "Failed to read the entire file!" << std::endl;
     return "";
@@ -61,26 +66,30 @@ std::string readJsonFile(const std::string& jsonFilePath)
   return fileContent;
 }
 
+//C style file reading
 std::vector<double> readBinFile(const std::string &binFilePath, size_t numberOfPairs)
 {
-  std::ifstream file(binFilePath, std::ios::binary | std::ios::ate);
+  FILE *file = fopen(binFilePath.c_str(), "rb");
   if (!file) {
     throw std::runtime_error("Failed to open file");
   }
 
   std::vector<double> data;
-  std::streamsize fileSize = file.tellg();
-  TimeBandwidth(__func__, fileSize);
-  file.seekg(0, std::ios::beg);
+  fseek(file, 0, SEEK_END);
+  long fileSize = ftell(file);
+  fseek(file, 0, SEEK_SET);
 
   size_t numElements = fileSize / sizeof(double);
   data.resize(numElements);
 
-  if (!file.read(reinterpret_cast<char*>(data.data()), fileSize))
+  TimeBandwidth(__func__, fileSize);
+  if (fread(data.data(), sizeof(double), numElements, file) != numElements)
   {
+    fclose(file);
     throw std::runtime_error("Failed to read file");
   }
 
+  fclose(file);
   return data;
 }
 
@@ -98,6 +107,8 @@ int main(int argc, char* argv[])
   std::string jsonString;
 
   jsonString = readJsonFile(jsonFilePath);
+
+  ReadEntireFile(jsonFilePath.c_str());
 
   auto json = JSONParser::parse(jsonString);
 
