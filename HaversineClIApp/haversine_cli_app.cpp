@@ -99,7 +99,6 @@ int main(int argc, char* argv[])
 
   jsonString = readJsonFile(jsonFilePath);
 
-
   auto json = JSONParser::parse(jsonString);
 
   auto pairs = json["pairs"].getArray();
@@ -136,8 +135,9 @@ int main(int argc, char* argv[])
   fprintf(stdout, "Reference sum: %.16f\n", referenceSum);
   fprintf(stdout, "Difference: %.16f\n", sum - referenceSum);
 
-
   EndAndPrintProfile();
   return 0;
 
 }
+
+ProfilerEndOfCompilationUnit;

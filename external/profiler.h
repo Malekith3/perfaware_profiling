@@ -166,7 +166,7 @@ struct profile_block
 #define NameConcat2(A, B) A##B
 #define NameConcat(A, B) NameConcat2(A, B)
 #define TimeBandwidth(Name, ByteCount) profile_block NameConcat(Block, __LINE__)(Name, __COUNTER__ + 1, ByteCount)
-#define ProfilerEndOfCompilationUnit static_assert(__COUNTER__ < ArrayCount(GlobalProfilerAnchors), "Number of profile points exceeds size of profiler::Anchors array")
+#define ProfilerEndOfCompilationUnit static_assert(__COUNTER__ < ArrayCount(GetGlobalProfilerAnchors()), "Number of profile points exceeds size of profiler::Anchors array")
 
 inline void PrintTimeElapsed(u64 TotalTSCElapsed, u64 TimerFreq, profile_anchor *Anchor)
 {

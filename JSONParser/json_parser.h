@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <variant>
 #include <stdexcept>
+#include "profiler.h"
 
 enum class JSONType : uint8_t
 {

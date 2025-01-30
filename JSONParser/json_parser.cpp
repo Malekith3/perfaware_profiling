@@ -1,5 +1,4 @@
 #include "json_parser.h"
-#include "profiler.h"
 
 static std::variant<std::string, bool, double> getValueFromString(const std::string &value)
 {
