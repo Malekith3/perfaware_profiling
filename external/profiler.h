@@ -1,6 +1,14 @@
-//
-// Created by sanek on 30/01/2025.
-//
+/* ========================================================================
+
+   (C) Copyright 2023 by Molly Rocket, Inc., All Rights Reserved.
+
+   This software is provided 'as-is', without any express or implied
+   warranty. In no event will the authors be held liable for any damages
+   arising from the use of this software.
+
+   Please see https://computerenhance.com for more information
+
+   ======================================================================== */
 
 #ifndef PERFAWARE_PROFILING_EXTERNAL_PROFILER_H_
 #define PERFAWARE_PROFILING_EXTERNAL_PROFILER_H_
@@ -10,11 +18,78 @@
 #endif
 
 #include <cstdint>
-#include "metrics.h"
 
 using u32 = uint32_t;
 using f64 = double;
 using u64 = uint64_t;
+
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+
+#ifdef _WIN32
+
+#include <intrin.h>
+#include <Windows.h>
+
+inline u64 GetOSTimerFreq()
+{
+  LARGE_INTEGER Freq;
+  QueryPerformanceFrequency(&Freq);
+  return Freq.QuadPart;
+}
+
+inline u64 ReadOSTimer()
+{
+  LARGE_INTEGER Value;
+  QueryPerformanceCounter(&Value);
+  return Value.QuadPart;
+}
+
+#else // Non-Windows (Linux/macOS)
+
+#include <x86intrin.h>
+#include <sys/time.h>
+
+inline u64 GetOSTimerFreq()
+{
+    return 1000000;
+}
+
+inline u64 ReadOSTimer()
+{
+    struct timeval Value;
+    gettimeofday(&Value, nullptr);
+    return GetOSTimerFreq() * static_cast<u64>(Value.tv_sec) + static_cast<u64>(Value.tv_usec);
+}
+
+#endif // _WIN32
+
+inline u64 ReadCPUTimer()
+{
+  return __rdtsc();
+}
+
+inline u64 EstimateCPUTimerFreq()
+{
+  constexpr u64 MillisecondsToWait = 100;
+  u64 OSFreq = GetOSTimerFreq();
+
+  u64 CPUStart = ReadCPUTimer();
+  u64 OSStart = ReadOSTimer();
+  u64 OSEnd = 0;
+  u64 OSElapsed = 0;
+  u64 OSWaitTime = OSFreq * MillisecondsToWait / 1000;
+
+  while (OSElapsed < OSWaitTime)
+  {
+    OSEnd = ReadOSTimer();
+    OSElapsed = OSEnd - OSStart;
+  }
+
+  u64 CPUEnd = ReadCPUTimer();
+  u64 CPUElapsed = CPUEnd - CPUStart;
+
+  return OSElapsed ? (OSFreq * CPUElapsed / OSElapsed) : 0;
+}
 
 struct profile_anchor
 {
@@ -42,6 +117,45 @@ inline u32& getGlobalProfilerParent()
 {
   static u32 GlobalProfilerParent;
   return GlobalProfilerParent;
+}
+
+inline void PrintTimeElapsed(u64 TotalTSCElapsed, profile_anchor *Anchor)
+{
+  f64 Percent = 100.0 * ((f64)Anchor->TSCElapsedExclusive / (f64)TotalTSCElapsed);
+  printf("  %s[%llu]: %llu (%.2f%%", Anchor->Label, Anchor->HitCount, Anchor->TSCElapsedExclusive, Percent);
+  if(Anchor->TSCElapsedInclusive != Anchor->TSCElapsedExclusive)
+  {
+    f64 PercentWithChildren = 100.0 * ((f64)Anchor->TSCElapsedInclusive / (f64)TotalTSCElapsed);
+    printf(", %.2f%% w/children", PercentWithChildren);
+  }
+  printf(")\n");
+}
+
+inline void BeginProfile()
+{
+  GetProfiler().StartTSC = ReadCPUTimer();
+}
+
+inline void EndAndPrintProfile()
+{
+  GetProfiler().EndTSC = ReadCPUTimer();
+  u64 CPUFreq = EstimateCPUTimerFreq();
+
+  u64 TotalCPUElapsed = GetProfiler().EndTSC - GetProfiler().StartTSC;
+
+  if(CPUFreq)
+  {
+    printf("\nTotal time: %0.4fms (CPU freq %llu)\n", 1000.0 * (f64)TotalCPUElapsed / (f64)CPUFreq, CPUFreq);
+  }
+
+  for(u32 AnchorIndex = 0; AnchorIndex < ArrayCount(GetProfiler().Anchors); ++AnchorIndex)
+  {
+    profile_anchor *Anchor = GetProfiler().Anchors + AnchorIndex;
+    if(Anchor->TSCElapsedInclusive)
+    {
+      PrintTimeElapsed(TotalCPUElapsed, Anchor);
+    }
+  }
 }
 
 #if PROFILER
@@ -99,16 +213,9 @@ struct profile_block
 #define NameConcat(A, B) NameConcat2(A, B)
 #define TimeBlock(Name) profile_block NameConcat(Block, __LINE__)(Name, __COUNTER__ + 1);
 #define TimeFunction TimeBlock(__func__)
-
-void BeginProfile();
-void EndAndPrintProfile();
 #else
-
 #define TimeBlock(Name)
 #define TimeFunction
-
-void BeginProfile();
-void EndAndPrintProfile();
 #endif
 
 #endif //PERFAWARE_PROFILING_EXTERNAL_PROFILER_H_
