@@ -108,8 +108,6 @@ int main(int argc, char* argv[])
 
   jsonString = readJsonFile(jsonFilePath);
 
-  ReadEntireFile(jsonFilePath.c_str());
-
   auto json = JSONParser::parse(jsonString);
 
   auto pairs = json["pairs"].getArray();

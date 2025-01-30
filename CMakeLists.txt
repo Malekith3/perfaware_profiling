@@ -16,8 +16,7 @@ add_executable(test_json_parser
 add_executable(haversine_cli_app
         external/haversine_formula.cpp
         HaversineCLIApp/haversine_cli_app.cpp
-        JSONParser/json_parser.cpp
-        external/filereading.cpp)
+        JSONParser/json_parser.cpp)
 
 add_executable(haversine_generator
         external/haversine_formula.cpp
