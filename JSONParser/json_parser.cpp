@@ -1,4 +1,5 @@
 #include "json_parser.h"
+#include "profiler.h"
 
 static std::variant<std::string, bool, double> getValueFromString(const std::string &value)
 {
@@ -133,120 +134,121 @@ static JSONNode createJsonNodeFromVariant(std::variant<std::string, bool, double
 
 JSONNode JSONParser::parse(const std::string &json)
 {
-    if(json.empty())
+  TimeFunction;
+  if(json.empty())
+  {
+    return {};
+  }
+
+  JSONNode rootNode;
+
+  if(*json.begin() == '{' && json.back() == '}')
+  {
+     rootNode = JSONNode(JSONType::OBJECT);
+  }
+
+  size_t jsonIter{0u};
+  bool arrayFlag{false};
+  std::string lastKey;
+  std::string arrayKey;
+  bool newJsonObject{false};
+
+  auto getArrayNode = [&rootNode, &lastKey, &arrayKey]() -> JSONNode&
+  {
+    if(arrayKey.empty())
     {
-      return {};
+      return rootNode.getArray().back()[lastKey];
     }
+    return rootNode[arrayKey].getArray().back()[lastKey];
+  };
 
-    JSONNode rootNode;
+  while(jsonIter < json.size())
+  {
+    skipWhiteSpace(json, jsonIter);
 
-    if(*json.begin() == '{' && json.back() == '}')
+    if(json[jsonIter] == '\"')
     {
-       rootNode = JSONNode(JSONType::OBJECT);
-    }
+      lastKey = searchKey(json, jsonIter);
 
-    size_t jsonIter{0u};
-    bool arrayFlag{false};
-    std::string lastKey;
-    std::string arrayKey;
-    bool newJsonObject{false};
-
-    auto getArrayNode = [&rootNode, &lastKey, &arrayKey]() -> JSONNode&
-    {
-      if(arrayKey.empty())
+      if(arrayFlag && newJsonObject)
       {
-        return rootNode.getArray().back()[lastKey];
-      }
-      return rootNode[arrayKey].getArray().back()[lastKey];
-    };
-
-    while(jsonIter < json.size())
-    {
-      skipWhiteSpace(json, jsonIter);
-
-      if(json[jsonIter] == '\"')
-      {
-        lastKey = searchKey(json, jsonIter);
-
-        if(arrayFlag && newJsonObject)
+        if(arrayKey.empty())
         {
-          if(arrayKey.empty())
-          {
-            rootNode.getArray().emplace_back(JSONType::OBJECT);
-            rootNode.getArray().back()[lastKey] = JSONNode();
-            newJsonObject = false;
-          }
-          else
-          {
-            rootNode[arrayKey].getArray().emplace_back(JSONType::OBJECT);
-            rootNode[arrayKey].getArray().back()[lastKey] = JSONNode();
-            newJsonObject = false;
-          }
+          rootNode.getArray().emplace_back(JSONType::OBJECT);
+          rootNode.getArray().back()[lastKey] = JSONNode();
+          newJsonObject = false;
         }
         else
         {
-          rootNode[lastKey] = JSONNode();
+          rootNode[arrayKey].getArray().emplace_back(JSONType::OBJECT);
+          rootNode[arrayKey].getArray().back()[lastKey] = JSONNode();
+          newJsonObject = false;
         }
+      }
+      else
+      {
+        rootNode[lastKey] = JSONNode();
+      }
 
-        searchForSemiColon(json, jsonIter);
+      searchForSemiColon(json, jsonIter);
 
-        JSONNode& node = arrayFlag ? getArrayNode() : rootNode[lastKey];
+      JSONNode& node = arrayFlag ? getArrayNode() : rootNode[lastKey];
 
-        if(json[jsonIter] == ':')
+      if(json[jsonIter] == ':')
+      {
+        jsonIter++;
+        skipWhiteSpace(json, jsonIter);
+
+        if(json[jsonIter] == '\"')
         {
-          jsonIter++;
-          skipWhiteSpace(json, jsonIter);
-
-          if(json[jsonIter] == '\"')
-          {
-            std::string value = searchForString(json, jsonIter);
-            auto valueVariant = getValueFromString(value);
-            node = createJsonNodeFromVariant(valueVariant);
-          }
-          else if(json[jsonIter] == 't' || json[jsonIter] == 'f')
-          {
-            std::string value = searchForBool(json, jsonIter);
-            auto valueVariant = getValueFromString(value);
-            node = createJsonNodeFromVariant(valueVariant);
-          }
-          else if(std::isdigit(json[jsonIter]) || json[jsonIter] == '-')
-          {
-            std::string value = searchForNumber(json, jsonIter);
-            auto valueVariant = getValueFromString(value);
-            node = createJsonNodeFromVariant(valueVariant);
-          }
+          std::string value = searchForString(json, jsonIter);
+          auto valueVariant = getValueFromString(value);
+          node = createJsonNodeFromVariant(valueVariant);
         }
-      }
-
-      if(json[jsonIter] == '[')
-      {
-        arrayFlag = true;
-        if(rootNode.isEmpty())
+        else if(json[jsonIter] == 't' || json[jsonIter] == 'f')
         {
-          rootNode = JSONNode(JSONType::ARRAY);
+          std::string value = searchForBool(json, jsonIter);
+          auto valueVariant = getValueFromString(value);
+          node = createJsonNodeFromVariant(valueVariant);
         }
-        else if (!lastKey.empty())
+        else if(std::isdigit(json[jsonIter]) || json[jsonIter] == '-')
         {
-          rootNode[lastKey] = JSONNode(JSONType::ARRAY);
-          arrayKey = lastKey;
+          std::string value = searchForNumber(json, jsonIter);
+          auto valueVariant = getValueFromString(value);
+          node = createJsonNodeFromVariant(valueVariant);
         }
       }
-      else if(json[jsonIter] == ']')
-      {
-        arrayFlag = false;
-      }
-
-      if(json[jsonIter] == '{')
-      {
-        newJsonObject = true;
-      }
-      else if(json[jsonIter] == '}')
-      {
-        newJsonObject = false;
-      }
-
-      jsonIter++;
     }
 
-    return rootNode;
+    if(json[jsonIter] == '[')
+    {
+      arrayFlag = true;
+      if(rootNode.isEmpty())
+      {
+        rootNode = JSONNode(JSONType::ARRAY);
+      }
+      else if (!lastKey.empty())
+      {
+        rootNode[lastKey] = JSONNode(JSONType::ARRAY);
+        arrayKey = lastKey;
+      }
+    }
+    else if(json[jsonIter] == ']')
+    {
+      arrayFlag = false;
+    }
+
+    if(json[jsonIter] == '{')
+    {
+      newJsonObject = true;
+    }
+    else if(json[jsonIter] == '}')
+    {
+      newJsonObject = false;
+    }
+
+    jsonIter++;
+  }
+
+  return rootNode;
 }

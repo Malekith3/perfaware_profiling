@@ -2,10 +2,11 @@
 #include <fstream>
 #include "haversine_formula.cpp"
 #include "json_parser.h"
-
+#include "profiler.h"
 
 bool isCliArgsValid(int argc, char* argv[])
 {
+  TimeFunction;
   if (argc != 3)
   {
     std::cerr << "Usage: " << argv[0] << " <pairs_json_file> <answers_f64_file>" << std::endl;
@@ -41,6 +42,7 @@ bool isCliArgsValid(int argc, char* argv[])
 
 std::string readJsonFile(const std::string& jsonFilePath)
 {
+  TimeFunction;
   std::ifstream jsonFile(jsonFilePath, std::ios::in | std::ios::binary | std::ios::ate);
   if (!jsonFile)
   {
@@ -61,6 +63,7 @@ std::string readJsonFile(const std::string& jsonFilePath)
 
 std::vector<double> readBinFile(const std::string& binFilePath)
 {
+  TimeFunction;
   std::ifstream binFile(binFilePath, std::ios::binary);
   if (!binFile)
   {
@@ -77,8 +80,10 @@ std::vector<double> readBinFile(const std::string& binFilePath)
   return distances;
 }
 
+
 int main(int argc, char* argv[])
 {
+  BeginProfile();
   if (!isCliArgsValid(argc, argv))
   {
     return 1;
@@ -88,8 +93,11 @@ int main(int argc, char* argv[])
   std::string binFilePath = argv[2];
 
   std::string jsonString = readJsonFile(jsonFilePath);
+
   auto json = JSONParser::parse(jsonString);
+
   auto answers = readBinFile(binFilePath);
+
   auto pairs = json["pairs"].getArray();
 
   if(answers.size()!= pairs.size())
@@ -122,6 +130,8 @@ int main(int argc, char* argv[])
   fprintf(stdout, "Reference sum: %.16f\n", referenceSum);
   fprintf(stdout, "Difference: %.16f\n", sum - referenceSum);
 
+
+  EndAndPrintProfile();
   return 0;
 
 }
