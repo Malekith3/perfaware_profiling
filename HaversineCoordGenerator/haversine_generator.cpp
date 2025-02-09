@@ -4,6 +4,7 @@
 #include <array>
 #include <fstream>
 #include <iomanip>
+#include <bits/stl_algo.h>
 
 #include "haversine_formula.cpp"
 

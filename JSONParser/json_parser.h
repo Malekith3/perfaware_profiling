@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <variant>
 #include <stdexcept>
+#include <vector>
+
 #include "profiler.h"
 
 enum class JSONType : uint8_t
@@ -21,7 +23,7 @@ class JSONNode
 {
   public:
     JSONNode() : _type(JSONType::NULLT) {}
-    explicit JSONNode(nullptr_t value) : JSONNode() {}
+    explicit JSONNode(std::nullptr_t value) : JSONNode() {}
     explicit JSONNode(JSONType type) : _type(type) {}
     explicit JSONNode(double value) : _type(JSONType::NUMBER), _dataValue(value) {}
     explicit JSONNode(const std::string& value) : _type(JSONType::STRING), _dataValue(value) {}
