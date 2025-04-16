@@ -1,5 +1,6 @@
 *.json
 *.f64
+*.obj
 
 # CLion specific files
 .idea/
